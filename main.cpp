@@ -1,250 +1,99 @@
 #include <iostream>
-#include <cmath>
-
-namespace top {
-  struct p_t {
-    int x, y;
-  };
+namespace topit {
+  struct p_t { int x, y; };
+  bool operator==(p_t, p_t);
+  bool operator!=(p_t, p_t);
+  struct f_t { p_t aa, bb; };
 
   struct IDraw {
+    virtual ~IDraw() = default;
     virtual p_t begin() const = 0;
     virtual p_t next(p_t) const = 0;
   };
 
-  bool operator==(p_t a, p_t b)
-  {
-    return a.x == b.x && a.y == b.y;
-  }
-
-  bool operator!=(p_t a, p_t b)
-  {
-    return !(a == b);
-  }
-
   struct Dot: IDraw {
     Dot(int x, int y);
-    Dot(p_t p);
+    explicit Dot(p_t dd);
     p_t begin() const override;
-    p_t next(p_t p) const override;
-    p_t o;
+    p_t next(p_t) const override;
+    p_t d;
   };
+  // Домашнее задание:
+  // - Добавить ещё 2-3 фигуры:
+  //   - Вертикальный отрезок
+  //   - Горизонтальный отрезок
+  //   - Диагональ под 45 заданной длины
+  //   - Придумать свою фигуру
 
-  struct VSeg: IDraw {
-    VSeg(int x, int y, int l);
-    VSeg(p_t p, int l);
-    p_t begin() const override;
-    p_t next(p_t p) const override;
-    p_t start;
-    int length;
-  };
+  // расширять заданный массив точками из очередной фигуры
+  // - extend...
+  size_t points(const IDraw& d, p_t** pts, size_t s);
 
-  struct HSeg: IDraw {
-    HSeg(int x, int y, int l);
-    HSeg(p_t p, int l);
-    p_t begin() const override;
-    p_t next(p_t p) const override;
-    p_t start;
-    int length;
-  };
+  // найти минимум и максимум по каждой координате среди точек и сформировать фрейм
+  f_t frame(const p_t* pts, size_t s);
 
-  struct Circle: IDraw {
-    Circle(int x, int y, int r);
-    Circle(p_t p, int r);
-    p_t begin() const override;
-    p_t next(p_t p) const override;
-    p_t o;
-    int radius;
-  };
+  // построить полотно (из фрейма получить количество столбцов и колонок)
+  char * canvas(f_t fr, char fill);
 
-  struct frame_t {
-    p_t left_bot;
-    p_t right_top;
-  };
+  // координаты точки перевести в координаты в двумерном массиве
+  void paint(char* cnv, f_t fr, p_t p, char fill);
 
-  void make_f(IDraw ** b, size_t k);
-  void get_points(IDraw * b, p_t ** ps, size_t & s);
-  frame_t build_frame(const p_t * ps, size_t s);
-  char * build_canvas(frame_t f);
-  void paint_canvas(char * cnv, frame_t fr, const p_t * ps, size_t k, char f);
-  void print_canvas(const char * cnv, frame_t fr);
+  // вывод двумперного массива на основе размеров, определяемых фреймом
+  void flush(std::ostream& os, const char* cnv, f_t fr);
 }
-
-int main()
-{
-  using namespace top;
+int main() {
+  using topit::IDraw;
+  using topit::Dot;
+  using topit::f_t;
+  using topit::p_t;
   int err = 0;
-  const size_t count = 3;
-  IDraw * f[count] = {};
-  p_t * p = nullptr;
+  IDraw* shps[3] = {};
+  p_t * pts = nullptr;
   size_t s = 0;
-  char * cnv = nullptr;
   try {
-    make_f(f, 3);
+    shps[0] = new Dot(0, 0);
+    shps[1] = new Dot(5, 7);
+    shps[2] = new Dot(-5, -2);
     for (size_t i = 0; i < 3; ++i) {
-      get_points(f[i], &p, s);
+      s += points(*(shps[i]), &pts, s);
     }
-    frame_t fr = build_frame(p, s);
-    cnv = build_canvas(fr);
-    paint_canvas(cnv, fr, p, s, '#');
-    print_canvas(cnv, fr);
+    f_t fr = frame(pts, s);
+    char * cnv = canvas(fr, '.');
+    for (size_t i = 0; i < s; ++i) {
+      paint(cnv, fr, pts[i], '#');
+    }
+    flush(std::cout, cnv, fr);
+    delete [] cnv;
   } catch (...) {
-    err = 1;
+    err = 2;
+    std::cerr << "Bad drawing\n";
   }
-  delete f[0];
-  delete f[1];
-  delete f[2];
-  delete [] p;
-  delete [] cnv;
+  delete [] pts;
+  delete shps[0];
+  delete shps[1];
+  delete shps[2];
   return err;
 }
-
-top::Dot::Dot(int x, int y):
-  IDraw(),
-  o{x, y}
+topit::Dot::Dot(p_t dd):
+ IDraw(),
+ d{dd}
 {}
-
-top::Dot::Dot(p_t p):
-  IDraw(),
-  o(p)
+topit::Dot::Dot(int x, int y):
+ IDraw(),
+ d{x, y}
 {}
-
-top::p_t top::Dot::begin() const
-{
-  return o;
+topit::p_t topit::Dot::begin() const {
+  return d;
 }
-
-top::p_t top::Dot::next(p_t p) const
-{
-  return begin();
-}
-
-top::VSeg::VSeg(int x, int y, int l):
-  IDraw(),
-  start{x, y},
-  length(l)
-{
-  if (length == 0) {
-    throw std::invalid_argument("lenght can not be 0");
+topit::p_t topit::Dot::next(p_t prev) const {
+  if (prev != begin()) {
+    throw std::logic_error("bad impl");
   }
-  if (length < 0) {
-    length *= -1;
-    start.y -= length;
-  }
+  return d;
 }
-
-top::VSeg::VSeg(p_t p, int l)
-{
-  VSeg(p.x, p.y, l);
+bool topit::operator==(p_t a, p_t b) {
+  return a.x == b.x && a.y == b.y;
 }
-
-top::p_t top::VSeg::begin() const
-{
-  return start;
-}
-
-top::p_t top::VSeg::next(p_t p) const
-{
-  if (p.y == start.y + length - 1) {
-    return begin();
-  }
-  return p_t{start.x, p.y + 1};
-}
-
-top::HSeg::HSeg(int x, int y, int l):
-  IDraw(),
-  start{x, y},
-  length(l)
-{
-  if (length == 0) {
-    throw std::invalid_argument("lenght can not be 0");
-  }
-  if (length < 0) {
-    length *= -1;
-    start.x -= length;
-  }
-}
-
-top::HSeg::HSeg(p_t p, int l)
-{
-  HSeg(p.x, p.y, l);
-}
-
-top::p_t top::HSeg::begin() const
-{
-  return start;
-}
-
-top::p_t top::HSeg::next(p_t p) const
-{
-  if (p.x == start.x + length - 1) {
-    return begin();
-  }
-  return p_t{p.x + 1, start.y};
-}
-
-top::Circle::Circle(int x, int y, int r):
-  IDraw(),
-  o{x, y},
-  radius(r)
-{
-  if (radius == 0) {
-    throw std::invalid_argument("radius can not be 0");
-  }
-  if (radius < 0) {
-    radius *= -1;
-  }
-}
-
-top::Circle::Circle(p_t p, int r)
-{
-  Circle(p.x, p.y, r);
-}
-
-top::p_t top::Circle::begin() const
-{
-  return p_t{o.x + radius, o.y};
-}
-
-top::p_t top::Circle::next(p_t p) const
-{
-  if (radius == 1) {
-    return begin();
-  }
-}
-
-void top::make_f(top::IDraw ** b, size_t k)
-{
-  b[0] = new Dot(0, 0);
-  b[1] = new Dot(-1, -5);
-  b[2] = new Dot(7, 7);
-}
-
-void top::get_points(top::IDraw * b, p_t ** ps, size_t & s)
-{
-  p_t a = b->begin();
-  // Достать точки
-  // Сгенерировать точки
-  // Положить в ps (обновить массив)
-  // Обновить размер
-}
-
-top::frame_t top::build_frame(const top::p_t * ps, size_t s)
-{
-  // Найти min и max для x и y
-  // Сформировать frame_t
-}
-
-char * top::build_canvas(top::frame_t f)
-{
-  // Посчитать кол-во колонок и строк (max - min + 1)
-}
-
-void top::paint_canvas(char * cnv, top::frame_t fr, const top::p_t * ps, size_t k, char f)
-{
-  // Перевести в другие координаты
-}
-
-void top::print_canvas(const char * cnv, top::frame_t fr)
-{
-  // std::cout
+bool topit::operator!=(p_t a, p_t b) {
+  return !(a == b);
 }
