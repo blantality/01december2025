@@ -1,14 +1,12 @@
 #include <iostream>
+#include <cmath>
 
-namespace top
-{
-  struct p_t
-  {
+namespace top {
+  struct p_t {
     int x, y;
   };
 
-  struct IDraw
-  {
+  struct IDraw {
     virtual p_t begin() const = 0;
     virtual p_t next(p_t) const = 0;
   };
@@ -23,66 +21,91 @@ namespace top
     return !(a == b);
   }
 
-  struct Dot: IDraw
-  {
-    p_t begin() const override;
-    p_t next(p_t) const override;
-    p_t o;
+  struct Dot: IDraw {
     Dot(int x, int y);
+    Dot(p_t p);
+    p_t begin() const override;
+    p_t next(p_t p) const override;
+    p_t o;
   };
 
-  struct frame_t
-  {
+  struct VSeg: IDraw {
+    VSeg(int x, int y, int l);
+    VSeg(p_t p, int l);
+    p_t begin() const override;
+    p_t next(p_t p) const override;
+    p_t start;
+    int length;
+  };
+
+  struct HSeg: IDraw {
+    HSeg(int x, int y, int l);
+    HSeg(p_t p, int l);
+    p_t begin() const override;
+    p_t next(p_t p) const override;
+    p_t start;
+    int length;
+  };
+
+  struct Circle: IDraw {
+    Circle(int x, int y, int r);
+    Circle(p_t p, int r);
+    p_t begin() const override;
+    p_t next(p_t p) const override;
+    p_t o;
+    int radius;
+  };
+
+  struct frame_t {
     p_t left_bot;
     p_t right_top;
   };
 
-
-  void make_f(IDraw** b, size_t k); //
-  void get_points(IDraw * b, p_t **ps, size_t & s); //
-  frame_t build_frame(const p_t * ps, size_t s); //
-  char * build_canvas(frame_t f); //
-  void paint_canvas(char * cnv, frame_t fr, const p_t * ps, size_t k, char f); //
-  void print_canvas(const char * cnv, frame_t fr); //
+  void make_f(IDraw ** b, size_t k);
+  void get_points(IDraw * b, p_t ** ps, size_t & s);
+  frame_t build_frame(const p_t * ps, size_t s);
+  char * build_canvas(frame_t f);
+  void paint_canvas(char * cnv, frame_t fr, const p_t * ps, size_t k, char f);
+  void print_canvas(const char * cnv, frame_t fr);
 }
 
 int main()
 {
   using namespace top;
-  IDraw* f[3] = {};
-  p_t * p = nullptr; size_t s = 0;
   int err = 0;
-  char* cnv = nullptr;
-  try
-  {
-    make_f(f,3);
-    for (size_t i = 0; i < 3; ++i)
-    {
+  const size_t count = 3;
+  IDraw * f[count] = {};
+  p_t * p = nullptr;
+  size_t s = 0;
+  char * cnv = nullptr;
+  try {
+    make_f(f, 3);
+    for (size_t i = 0; i < 3; ++i) {
       get_points(f[i], &p, s);
     }
     frame_t fr = build_frame(p, s);
     cnv = build_canvas(fr);
     paint_canvas(cnv, fr, p, s, '#');
     print_canvas(cnv, fr);
-  }
-  catch(...)
-  {
+  } catch (...) {
     err = 1;
   }
   delete f[0];
   delete f[1];
   delete f[2];
-  delete[] p;
-  delete[] cnv;
-
-
+  delete [] p;
+  delete [] cnv;
   return err;
-  
 }
 
 top::Dot::Dot(int x, int y):
   IDraw(),
-  o{x,y}
+  o{x, y}
+{}
+
+top::Dot::Dot(p_t p):
+  IDraw(),
+  o(p)
 {}
 
 top::p_t top::Dot::begin() const
@@ -90,7 +113,138 @@ top::p_t top::Dot::begin() const
   return o;
 }
 
-top::p_t top::Dot::next(p_t) const
+top::p_t top::Dot::next(p_t p) const
 {
   return begin();
+}
+
+top::VSeg::VSeg(int x, int y, int l):
+  IDraw(),
+  start{x, y},
+  length(l)
+{
+  if (length == 0) {
+    throw std::invalid_argument("lenght can not be 0");
+  }
+  if (length < 0) {
+    length *= -1;
+    start.y -= length;
+  }
+}
+
+top::VSeg::VSeg(p_t p, int l)
+{
+  VSeg(p.x, p.y, l);
+}
+
+top::p_t top::VSeg::begin() const
+{
+  return start;
+}
+
+top::p_t top::VSeg::next(p_t p) const
+{
+  if (p.y == start.y + length - 1) {
+    return begin();
+  }
+  return p_t{start.x, p.y + 1};
+}
+
+top::HSeg::HSeg(int x, int y, int l):
+  IDraw(),
+  start{x, y},
+  length(l)
+{
+  if (length == 0) {
+    throw std::invalid_argument("lenght can not be 0");
+  }
+  if (length < 0) {
+    length *= -1;
+    start.x -= length;
+  }
+}
+
+top::HSeg::HSeg(p_t p, int l)
+{
+  HSeg(p.x, p.y, l);
+}
+
+top::p_t top::HSeg::begin() const
+{
+  return start;
+}
+
+top::p_t top::HSeg::next(p_t p) const
+{
+  if (p.x == start.x + length - 1) {
+    return begin();
+  }
+  return p_t{p.x + 1, start.y};
+}
+
+top::Circle::Circle(int x, int y, int r):
+  IDraw(),
+  o{x, y},
+  radius(r)
+{
+  if (radius == 0) {
+    throw std::invalid_argument("radius can not be 0");
+  }
+  if (radius < 0) {
+    radius *= -1;
+  }
+}
+
+top::Circle::Circle(p_t p, int r)
+{
+  Circle(p.x, p.y, r);
+}
+
+top::p_t top::Circle::begin() const
+{
+  return p_t{o.x + radius, o.y};
+}
+
+top::p_t top::Circle::next(p_t p) const
+{
+  if (radius == 1) {
+    return begin();
+  }
+}
+
+void top::make_f(top::IDraw ** b, size_t k)
+{
+  b[0] = new Dot(0, 0);
+  b[1] = new Dot(-1, -5);
+  b[2] = new Dot(7, 7);
+}
+
+void top::get_points(top::IDraw * b, p_t ** ps, size_t & s)
+{
+  p_t a = b->begin();
+  // Достать точки
+  // Сгенерировать точки
+  // Положить в ps (обновить массив)
+  // Обновить размер
+}
+
+top::frame_t top::build_frame(const top::p_t * ps, size_t s)
+{
+  // Найти min и max для x и y
+  // Сформировать frame_t
+}
+
+char * top::build_canvas(top::frame_t f)
+{
+  // Посчитать кол-во колонок и строк (max - min + 1)
+}
+
+void top::paint_canvas(char * cnv, top::frame_t fr, const top::p_t * ps, size_t k, char f)
+{
+  // Перевести в другие координаты
+}
+
+void top::print_canvas(const char * cnv, top::frame_t fr)
+{
+  // std::cout
 }
